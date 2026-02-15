@@ -251,8 +251,9 @@ export const dispatchTelegramMessage = async ({
   let finalizedViaPreviewMessage = false;
 
   let queuedFinal = false;
+  let blockReplyCount = 0;
   try {
-    ({ queuedFinal } = await dispatchReplyWithBufferedBlockDispatcher({
+    const dispatchResult = await dispatchReplyWithBufferedBlockDispatcher({
       ctx: ctxPayload,
       cfg,
       dispatcherOptions: {
@@ -345,9 +346,13 @@ export const dispatchTelegramMessage = async ({
         onPartialReply: draftStream ? (payload) => updateDraftFromPartial(payload.text) : undefined,
         onModelSelected,
       },
-    }));
+    });
+    queuedFinal = dispatchResult.queuedFinal;
+    blockReplyCount = dispatchResult.counts.block;
   } finally {
-    if (!finalizedViaPreviewMessage) {
+    const shouldKeepPreviewMessage =
+      !finalizedViaPreviewMessage && blockReplyCount > 0 && !queuedFinal;
+    if (!finalizedViaPreviewMessage && !shouldKeepPreviewMessage) {
       await draftStream?.clear();
     }
     draftStream?.stop();
