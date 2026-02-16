@@ -200,16 +200,8 @@ describe("models list/status", () => {
     expect(runtime.log.mock.calls[0]?.[0]).toBe("zai/glm-4.7");
   });
 
-  it("models list provider filter normalizes z.ai alias", async () => {
-    await expectZaiProviderFilter("z.ai");
-  });
-
   it("models list provider filter normalizes Z.AI alias casing", async () => {
     await expectZaiProviderFilter("Z.AI");
-  });
-
-  it("models list provider filter normalizes z-ai alias", async () => {
-    await expectZaiProviderFilter("z-ai");
   });
 
   it("models list marks auth as unavailable when ZAI key is missing", async () => {

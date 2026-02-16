@@ -113,6 +113,7 @@ describe("dispatchTelegramMessage draft streaming", () => {
   async function dispatchWithContext(params: {
     context: TelegramMessageContext;
     telegramCfg?: Parameters<typeof dispatchTelegramMessage>[0]["telegramCfg"];
+    streamMode?: Parameters<typeof dispatchTelegramMessage>[0]["streamMode"];
   }) {
     await dispatchTelegramMessage({
       context: params.context,
@@ -120,7 +121,7 @@ describe("dispatchTelegramMessage draft streaming", () => {
       cfg: {},
       runtime: createRuntime(),
       replyToMode: "first",
-      streamMode: "partial",
+      streamMode: params.streamMode ?? "partial",
       textLimit: 4096,
       telegramCfg: params.telegramCfg ?? {},
       opts: { token: "token" },
