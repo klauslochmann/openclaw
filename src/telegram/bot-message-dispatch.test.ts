@@ -135,7 +135,7 @@ describe("dispatchTelegramMessage draft streaming", () => {
       async ({ dispatcherOptions, replyOptions }) => {
         await replyOptions?.onPartialReply?.({ text: "Hello" });
         await dispatcherOptions.deliver({ text: "Hello" }, { kind: "final" });
-        return { queuedFinal: true };
+        return { queuedFinal: true, counts: { block: 0, final: 1, tool: 0 } };
       },
     );
     deliverReplies.mockResolvedValue({ delivered: true });
@@ -174,7 +174,7 @@ describe("dispatchTelegramMessage draft streaming", () => {
   it("keeps block streaming enabled when account config enables it", async () => {
     dispatchReplyWithBufferedBlockDispatcher.mockImplementation(async ({ dispatcherOptions }) => {
       await dispatcherOptions.deliver({ text: "Hello" }, { kind: "final" });
-      return { queuedFinal: true };
+      return { queuedFinal: true, counts: { block: 0, final: 1, tool: 0 } };
     });
     deliverReplies.mockResolvedValue({ delivered: true });
 
@@ -201,7 +201,7 @@ describe("dispatchTelegramMessage draft streaming", () => {
       async ({ dispatcherOptions, replyOptions }) => {
         await replyOptions?.onPartialReply?.({ text: "Hel" });
         await dispatcherOptions.deliver({ text: "Hello final" }, { kind: "final" });
-        return { queuedFinal: true };
+        return { queuedFinal: true, counts: { block: 0, final: 1, tool: 0 } };
       },
     );
     deliverReplies.mockResolvedValue({ delivered: true });
@@ -221,7 +221,7 @@ describe("dispatchTelegramMessage draft streaming", () => {
     const longText = "x".repeat(5000);
     dispatchReplyWithBufferedBlockDispatcher.mockImplementation(async ({ dispatcherOptions }) => {
       await dispatcherOptions.deliver({ text: longText }, { kind: "final" });
-      return { queuedFinal: true };
+      return { queuedFinal: true, counts: { block: 0, final: 1, tool: 0 } };
     });
     deliverReplies.mockResolvedValue({ delivered: true });
     editMessageTelegram.mockResolvedValue({ ok: true, chatId: "123", messageId: "999" });
@@ -238,25 +238,36 @@ describe("dispatchTelegramMessage draft streaming", () => {
     expect(draftStream.stop).toHaveBeenCalled();
   });
 
-  it("disables block streaming when streamMode is off", async () => {
-    dispatchReplyWithBufferedBlockDispatcher.mockImplementation(async ({ dispatcherOptions }) => {
-      await dispatcherOptions.deliver({ text: "Hello" }, { kind: "final" });
-      return { queuedFinal: true };
-    });
+  it("keeps the preview message when block streaming produces no final reply", async () => {
+    const draftStream = createDraftStream(999);
+    createTelegramDraftStream.mockReturnValue(draftStream);
+    dispatchReplyWithBufferedBlockDispatcher.mockImplementation(
+      async ({ dispatcherOptions, replyOptions }) => {
+        await replyOptions?.onPartialReply?.({ text: "Hel" });
+        await dispatcherOptions.deliver({ text: "Hello block" }, { kind: "block" });
+        return { queuedFinal: false, counts: { block: 1, final: 0, tool: 0 } };
+      },
+    );
     deliverReplies.mockResolvedValue({ delivered: true });
 
-    await dispatchWithContext({
-      context: createContext(),
-      streamMode: "off",
-    });
+    await dispatchWithContext({ context: createContext() });
 
-    expect(createTelegramDraftStream).not.toHaveBeenCalled();
-    expect(dispatchReplyWithBufferedBlockDispatcher).toHaveBeenCalledWith(
-      expect.objectContaining({
-        replyOptions: expect.objectContaining({
-          disableBlockStreaming: true,
-        }),
-      }),
-    );
+    expect(draftStream.clear).not.toHaveBeenCalled();
+    expect(draftStream.stop).toHaveBeenCalled();
+  });
+
+  it("clears the preview when nothing is delivered", async () => {
+    const draftStream = createDraftStream(999);
+    createTelegramDraftStream.mockReturnValue(draftStream);
+    dispatchReplyWithBufferedBlockDispatcher.mockResolvedValue({
+      queuedFinal: false,
+      counts: { block: 0, final: 0, tool: 0 },
+    });
+    deliverReplies.mockResolvedValue({ delivered: false });
+
+    await dispatchWithContext({ context: createContext() });
+
+    expect(draftStream.clear).toHaveBeenCalledTimes(1);
+    expect(draftStream.stop).toHaveBeenCalled();
   });
 });
